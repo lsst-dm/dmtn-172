@@ -71,6 +71,9 @@ Measure astrometric motion parameters for matched sources, down to the single-ep
 Make use of masks from warp-comparison (including satellites) in producing final single-epoch catalogs.
   This can probably be done in catalog-space in terms of setting flag columns, but it may be that these masks are important for doing some of the background estimation we'd want to do prior to final single-epoch detection/deblending/measurement.
 
+Provide a harness for full-focal-plane PSF estimation.
+   We'll still probably do the second round of PSF estimation on each detector independently for the forseeable future, but we want to open up the ability to develop and test a full-focal-plane algorithm.
+
 Avoid workarounds from background-induced photometry biases in FGCM.
    This shouldn't be FGCM's job, and it shouldn't be something that only happens inside FGCM.
    It is unclear, however, whether the best solution is to run FGCM only after the final measurement step (after the final background-estimation step), or to try to devise some compensated-filter photometry that is insensitive to the background (for stars only) that we could run earlier, allowing FGCM to be run earlier.
@@ -91,7 +94,7 @@ Invariants to Preserve
 ======================
 
 What are the subtle (and of hard-won) properties of the current pipeline structure that we need to preserve?
-A lot of these are obvious any probably don't need to be listed here, but we should try to track anything that has caused problems that led to restructuring in the past.
+A lot of these are obvious and probably don't need to be listed here, but we should try to track anything that has caused problems that led to restructuring in the past.
 
 - Aperture corrections must be applied before we can compute "extendedness" for star-galaxy classification.
 
@@ -102,6 +105,30 @@ Pipeline Realizations
 =====================
 
 Each subsection below is a different proposal for the DRP pipeline, and should include some discussion of how and why it differs from other realizations.
+
+Diagrams should generally leave out dataset types that don't participate in the relationships between tasks (e.g. calibrations, reference catalogs).
+
+The Original
+------------
+
+This is the pipeline we run in Gen2, imagined as a complete Gen3 pipeline, given what I know about the tasks that are still being converted.
+I've included the tasks all the way through ``compareWarpAssembleCoadd``, because realizations of the future pipeline will often want to feed the masks it generates back into single-frame processing steps.
+
+Those of you who haven't been following the FGCM Gen3 conversion may be surprised to see it taking ``sourceTable_visit`` and ``visitSummary`` as inputs and write visit-level catalogs of ``PhotoCalibs`` as outputs, but that solves a number of problems in Gen3 and would probably be a good move in Gen2 if it was worth our time to make the change there, too.
+I (JFB) was surprised to see that the former is the *standardized* parquet table, because that means we definitely can't apply the FGCM calibrations before or when making the standardized parquet table, but given that there's no unstandardized visit-level parquet dataset (i.e. ``source_visit``), that makes sense right now.
+But it might make more sense to consolidate ``source`` -> ``source_visit`` and have FGCM consume that instead, even before we consider the other changes proposed in this technote;  we'd then standardize ``source_visit`` -> ``sourceTable_visit`` directly and apply calibrations at that point.
+
+I'm mostly assuming Jointcal will use those same visit-level inputs and similarly have a visit-level ``ExposureCatalog`` as its output, and I've talked to John P. a bit about that, but it's possible I've guessed wrong about some of those details.
+
+The names of tasks in the diagram below are the ``_DefaultName`` attributes for those tasks, and should also be used as their labels in the Gen3 pipeline definition.
+One exception is ``SkyCorrectionTask``; its ``_DefaultName``, ``skyCorr``, is the same as the name of its main output dataset type, so I've used ``correctSky`` in the diagram for the task instead.
+
+Finally, *wow*, we need some dataset type naming conventions.
+Let's think about that a bit as we design the future pipeline, and maybe by the time we're ready to start implementing it we'll have some ideas on how to better name things.
+
+.. figure:: /_static/the-original.svg
+    :name: pl-the-original
+    :target: http://target.link/url
 
 
 Major Questions
