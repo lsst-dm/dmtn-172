@@ -130,12 +130,163 @@ Let's think about that a bit as we design the future pipeline, and maybe by the 
     :name: pl-the-original
     :target: http://target.link/url
 
+JFB's Ambitious No-Fakes Pipeline, v1
+-------------------------------------
+
+This is JFB's first attempt at writing down a future pipelines that meets all of our goals, except for the ones involving adding fake sources.
+
+There's a ton to describe and explain here, but I'll start with the *simplifying* assumptions I've made, which actually keep this from being bigger than it is.
+
+- I've assumed that we can perform some kind of compensated filter photometry quite early (in ``characterizeImage``), to feed FGCM with fluxes that aren't corrupted by background subtraction.
+  And I've assumed that calibrating *those* fluxes is enough to calibrate later photometry that doesn't use compensated filters but can take advantage of better backgrounds.
+
+- I've assumed that we can use a catalog of high-detection-threshold stars (more or less what we detect in today's version of ``characterizeImage``) for *all* image characterization and calibration steps, so we can put off full-depth detection/deblending/measurement until all of those steps are complete.
+
+- I've only tried to write down a global-sequence-point version of FGCM, and I've rolled that up into one task instead of several.
+  Think of this as just drawing a box around the FGCM sub-graph, not declaring that FGCM shall be one task.
+
+And now some "ambitious" decisions I've made across the board; these generally simplify the pipeline itself, while probably complicating our transition to it.
+I've gone in that direction here because I'd prefer to think about the end state independently of the transition, but that may not wise; I'm betting we will want some "less ambitious" or transitional pipeline diagrams.
+Anyhow on that note,
+
+- I've assumed we'll just convert from afw.table to DataFrame/parquet *immediately* at the end of the ``PipelineTasks`` (just ``characterizeImage`` and ``finishVisitImage``) that perform measurement, and never write out ``afw.table.SourceCatalog`` objects (or if we do, it'll just be for ``Footprints``, and nothing will consume them).
+
+- I've assumed ``jointcal`` (or ``GBDES``; I'm guessing that's what we'll be using by the time we get there, but I've still used "jointcal" as the name of the step below) and ``FGCM`` can be made to use the same matched catalog, and we can do that matching up-front, once.
+
+- I've assumed we'll want to run our initial, single-visit photometric and astrometric calibration on full-visit catalogs, not visit-detector catalogs.  That should be a bit more robust, but it may or may not be something AP will want to do, depending on how big the robustness improvement is relative to the compute latency hit.
+  It also simplifies the pipeline description, just because it reduces the number of consolidate-to-visit steps.
+
+Now some nomenclature/conventions:
+
+- I've started using ``snake_case`` for dataset type names (while keeping ``camelCase`` for task labels), just to make it extra clear which is which.
+
+- I've started using ``pvi`` instad of ``calexp``.
+
+- I've tended to add prefixes to dataset type names when they aren't the final version, and remove those prefixes (or use ``pvi_`` as a prefix) when they are the final versions.
+
+- I've left off dependent dimensions, just for brevity (i.e. if "visit" or "detector" is present, we don't need to say "instrument").
+
+You'll also note that "tracts" don't appear in this pipeline until we get all of the way to coaddition, and instead you'll see "skypix[1-4]" as the spatial dimension for a lot of previous steps.
+These refer to HEALPix (preferably) or HTM (if necessary) grids at particular TBD depths, with roughly the following scales:
+
+skypix1
+   Used for matched ``ic_src`` catalogs; intended to have cells much larger than a visit, so most visits are wholly contained in one cell.
+
+skypix2
+   Scale at which ``jointcal`` runs; cells are intended to be no larger than those of skypix1 and no smaller than a visit.
+
+skypix3
+   Scale at which ``prepRevisit`` runs (see below); cells are no larger than those of skypix2, and no smaller than a detector.
+
+skypix4
+   Used for matched ``src`` catalogs.  Same size arguments as skypix1, as far as I can tell, and probably is just the same as skypix1.
+
+I've pretty much punted on some possibly important stuff here:
+
+- Fakes, obviously.
+
+- I think we'll need to re-do aperture corrections after we have our final PSF model, but it seems like that will need to be tied up with subtracting bright star wings and tying FGCM's calibration back to our final non-compensated-filter photometry.
+
+- I've halfheartedly tried to include background matching, as a ``comparison_bkg`` dataset output by a coaddition step, but it probably isn't a realistic depiction.
+
+And finally, a brief description of each step.
+I won't repeat the dimensions or the inputs and outputs here, so this section is definitely best read while constantly referring to the diagram below.
+
+isr
+   The same ISR we know and love, or whatever it evolves into independent of the plans of this technote.
+
+characterizeImage
+   Essentially the same ``CharacterizeImageTask`` we have today, though there are some parts I'd like to streamline.
+
+consolidateIcSrc
+   Just gathers the per-detector catalogs into a visit-level one.
+
+consolidateVisitSummary
+   Just gathers various per-detector Exposure components into a visit-level ``ExposureCatalog``.
+   Unlike what we have today, this doesn't deal with ``PhotoCalib`` or ``Wcs`` yet, because those don't exist yet.
+
+bootstrapAstrometry
+   Matches to a reference catalog and fits for initial WCSs, over a full visit.  Also outputs a thin table of sky coordinates, with the same rows as its input catalog.
+
+bootstrapPhotometry
+   Matches to a reference catalog and fits for initial photometric calibration, over a full visit.  Also outputs a thin table of calibrated fluxes, with the same rows as its input catalog.
+
+matchIcSrc
+   Multi-way match of all visit-level catalogs and one or more external reference catalogs (at least Gaia) over a large area of sky (skypix1).
+   Outputs normalized match indices (``ic_src_match_join``) and a summary table (``ic_src_match``).
+
+fgcm
+   At least a few rounds of ``fgcmFitCycle``.
+   Probably starts with FGCM making its own star table from the outputs of ``matchIcSrc``; hopefully it would start from the same matches, so what it uses would be a straightforward subset of those.
+   The LUT is not made here - that's more of a CPP pipeline thing, I think.
+   In addition to its own model and per-visit photometric calibration datasets, this also outputs a thin table of calibrated fluxes and inferred colors for each input source match (``ic_src_match_fluxes``).
+
+jointcal
+   Multi-epoch astrometry fitting, at first implemented by today's jointcal package, but eventually backed by GBDES.
+   Outputs both WCSs for all input visits and a thin table of stellar motion parameters for the bright-ish matched stars it was given.
+   A separate task will compute stellar motion parameters for more deeper detections later.
+   I'm assuming this will eventually do some internal DCR correction on its input positions, using the colors it gets (via ``ic_src_match_fluxes``) from FGCM.
+
+prepRevisit
+   A catalog-space operation that works out what we'll want to do on each detector-level image when we return to it shortly, based on what it sees in the matched catalogs.
+   This includes selecting PSF stars (and reserving some) and figuring out what data we'll want to extract from the images in order to fit the wings of bright stars.
+   It's entirely possible we'll actually make this multiple ``PipelineTasks``.
+
+extractRevisit
+   Return to the pixel data, one visit+detector at a time, and extract summary information we can use for visit-level catalog-space fitting.
+   For example, this might extract postage stamps for PSF estimation, a binned image for background estimation, and *something* for wings-of-stars fitting.
+
+fitRevisitPsf
+   Fit the final PSF model for an entire visit, using already-extracted postage stamps.
+
+fitRevisitBackground
+   Fit the wings of bright stars and a large-scale smooth background (after unsubtracting the original small-scale background from ``characterizeImage``), using the summary statistics from ``extractRevisit`` and whatever CPP products (e.g. something like today's ``sky`` frames) it likes.
+
+planCoaddition
+   A catalog-space operation that computes exactly which visits will go into each coadd *and their weights*, taking into account large-scale masks, PSF-size or -quality rejection, etc.
+   Doing this up front - and not per-patch - seems to be the only way to weigh visits consistently over the entire tract, and avoid discontinuities in the per-patch coadd images.
+   It also gives us a chance to figure out in advance what target PSFs each visit-level image will need to be matched to when we make warps.
+   It's quite possible that we'll actually want to make this multiple versions of the same PipelineTask, with each corresponding to a different final coadd dataset type.
+
+makeComparisonWarp
+   Essentially today's ``MakeWarpTask``, configured for making the PSF-matched warps that ``compareWarpAssembleCoadd`` will want to use.
+
+compareWarpAssembleCoadd
+   Initially this is today's ``CompareWarpAssembleCoaddTask``, but with an explicit output mask dataset.
+   Eventually I imagine this step doing background matching and producing a background output as well, but I don't know enough about background matching to know if that actually fits in this structure.
+
+finishVisitImage
+   Finally, we run detection at full depth (5-sigma threshold), redeblend, and remeasure, after applying all of the previous image characterization models we've produced, including the transformed backgrounds and masks from ``compareWarpAssembleCoadd``.
+   We also match to the previous ``ic_src_match`` catalog to propagate flags from those steps.
+   Because this is the first measurement we've run with our latest PSFs, we also remeasure our aperture corrections, which might actually be a quite different kind of aperture correction, if it needs to tie us back to the FGCM measurements.
+
+consolidateSrc
+   Just gathers the per-detector catalogs into a visit-level one.
+   Same task as ``consolidateIcSrc``, just reconfigured.
+
+matchSrc
+   Multi-way match of all visit-level catalogs and one or more external reference catalogs (at least Gaia) over a large area of sky (skypix4).
+   Outputs normalized match indices (``src_match_join``) and a summary table (``src_match``).
+   Same task as ``matchIcSrc``, just reconfigured.
+
+fitSrcMatchAstrometry
+   Fit stellar motion parameters for all matched ``src_match`` rows, holding the
+   WCSs fixed.
+
+
+.. figure:: /_static/jfb-ambitious-nofakes-01.svg
+    :name: pl-jfb-ambitious-nofakes-01
+    :target: http://target.link/url
+
+
+
 
 Major Questions
 ===============
 
 What are the open questions that drive the differences between different viable pipeline structures?
 
+- Can we feed FGCM with compensated-filter photometry in order to run it before background estimation is complete?
 
 
 .. Add content here.
