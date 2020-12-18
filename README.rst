@@ -23,6 +23,19 @@ This technical note is an informal collection of outlines, diagrams, and comment
 - GitHub repository: https://github.com/lsst-dm/dmtn-172
 - Build system: https://github.com/lsst-dm/dmtn-172/actions/
 
+**To add a new pipeline realization,**
+
+- Open a ticket and start a new branch of the technote.
+- Make a new ``.dot`` file in the root directory of the technote (probably by copying an existing one that similar to the one you want).
+- Add a new entry to the ``FIGURES`` variable in the ``Makefile``, using the same base filename as the name of the ``.dot`` file.
+- Start a new subsection under "Pipeline Realizations", and add a figure entry that references the diagram (again, see existing realizations for an example).
+- Update the "Goals", "Invariants", and "Major Questions" if your pipeline realization addresses a new or old problem, or makes different assumptions about what will work in the future.
+- Send the review to Jim.
+
+New pipeline realizations that are just slight modifications of existing ones are quite welcome - if the technote gets long, that's fine.
+The in-text descriptions of these pipelines can just highlight the diffs from the one they started from - they don't need to describe each step again.
+But they should have their own complete diagram.
+
 
 Build this technical note
 =========================
