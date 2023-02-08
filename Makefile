@@ -16,7 +16,7 @@ endif
 _static/%.svg : %.dot
 	dot -Tsvg $< -o $@
 
-FIGURES = _static/the-original.svg _static/jfb-ambitious-nofakes-01.svg
+FIGURES = _static/the-original.svg _static/jfb-ambitious-nofakes-01.svg _static/great-calibration-refactor.svg
 
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4

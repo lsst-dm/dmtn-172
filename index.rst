@@ -71,10 +71,10 @@ Each subsection below is a different proposal for the DRP pipeline, and should i
 
 Diagrams should generally leave out dataset types that don't participate in the relationships between tasks (e.g. calibrations, reference catalogs).
 
-The Original
-------------
+The Original: December 2020
+---------------------------
 
-This is the pipeline we run in Gen2, imagined as a complete Gen3 pipeline, given what I know about the tasks that are still being converted.
+This is the pipeline we ran in Gen2, imagined as a complete Gen3 pipeline, given what I know about the tasks that are still being converted.
 I've included the tasks all the way through ``compareWarpAssembleCoadd``, because realizations of the future pipeline will often want to feed the masks it generates back into single-frame processing steps.
 
 Those of you who haven't been following the FGCM Gen3 conversion may be surprised to see it taking ``sourceTable_visit`` and ``visitSummary`` as inputs and write visit-level catalogs of ``PhotoCalibs`` as outputs, but that solves a number of problems in Gen3 and would probably be a good move in Gen2 if it was worth our time to make the change there, too.
@@ -92,8 +92,8 @@ Let's think about that a bit as we design the future pipeline, and maybe by the 
 .. figure:: /_static/the-original.svg
     :name: pl-the-original
 
-JFB's Ambitious No-Fakes Pipeline, v1
--------------------------------------
+JFB's Ambitious No-Fakes Pipeline, v1: December 2020
+----------------------------------------------------
 
 This is JFB's first attempt at writing down a future pipelines that meets all of our goals, except for the ones involving adding fake sources.
 
@@ -240,6 +240,38 @@ fitSrcMatchAstrometry
     :name: pl-jfb-ambitious-nofakes-01
 
 
+The Great Calibration Refactor Proposal: February 2023
+------------------------------------------------------
+
+Goals and non-goals
+"""""""""""""""""""
+
+We're replacing essentially everything between ISR and coaddition.
+ISR and coaddition will see major changes (spurred by Calibpalooza and cell-based and chi-squared coadds, respectively), but we're considering those out-of-scope and mostly orthogonal.
+While we can and should implement this piecemeal when we can, we want a complete vision of what it will look like in the end, and in some cases it may be easier to replace many tasks at once.
+
+We lean towards merging PipelineTasks with the same dimensions that run to back-to-back rather than keeping them distinct.
+This is a bit of a shift - many smaller PipelineTasks leads to more flexibility via just pipeline definition changes, which has been very useful in prototyping, but we believe we are exited the prototyping phase and should instead prioritize the I/O optimization and pipeline-simplicity advantages of having fewer bigger PipelineTasks.
+
+This is probably our last best chance to get our naming conventions for dataset types and task labels under control, so we're including that in our proposal.
+
+Conventions
+"""""""""""
+
+- Task labels are camelCase and start with a lowercase verb.
+- Dataset type names are snake_case nouns preceded (if necessary) by adjectives.
+- "source" instead of "src" or "sources"
+- Avoid "catalog" or "cat" in dataset type names; use "source", "stars", "objects", or "matches" instead when appropriate.
+- "pvi" for visit+detector images
+- tables that are initially per-detector will get concatenated into per-visit tables should get a "_detector" suffix so the final thing does not need a suffix (and when we revamp later steps of the pipeline, the same for "_patch" so there's no "_tract");
+- Task labels and dataset type names are for "slots", not specific tasks or connection - usually those are 1-1, but when they are not, the label and dataset type names should remain fixed when a different task is swapped in.
+- "initial" catalogs are not (ever) SDM-standardized, while final catalogs are always standardized before they are written out.
+- Do include a "final" prefix on dataset types that represent the best version of something that are nevertheless temporaries that will not be retained.  Do not add any prefix to dataset types that will be retained for public access.
+- Convert source and object catalogs to Parquet before ever persisting them; only use SourceCatalog/FITS to hold Footprints.
+
+
+.. figure:: /_static/great-calibration-refactor.svg
+    :name: pl-great-calibration-refactor
 
 
 Major Questions
@@ -249,6 +281,9 @@ What are the open questions that drive the differences between different viable 
 
 - Can we feed FGCM with compensated-filter photometry in order to run it before background estimation is complete?
 
+- Do we need some kind of coaddition or warp-comparison to finalize our per-visit background models?  If so, will those also impact PSF modeling and/or aperture corrections?
+
+- Is a second round of astrometric fitting necessary to ensure PDF chromaticity is consistent with our (achromatic) WCSs?  Is it sufficient?
 
 .. Add content here.
 .. Do not include the document title (it's automatically added from metadata.yaml).
