@@ -2,7 +2,6 @@ digraph the_original {
     # TODO: merge finalizeCharacterization and updateVisitSummary?
     # PipelineTasks
     node [shape=box,style="dashed"];
-    calibs [label="(various calibrations)\n{detector?}"];
     isr [label="isr\n{detector, exposure}"];
     makeWarp [label="makeWarp\n{tract, patch, visit}"];
     compareWarpAssembleCoadd [label="compareWarpAssembleCoadd\n{tract, patch, band}"];
@@ -22,10 +21,7 @@ digraph the_original {
     compressImage [label="compressImage\n{detector, visit}"];
     # DatasetTypes
     node [style="rounded,dashed", fillcolor="gray20"];
-    raw [label="raw\n{detector, exposure}\nExposure"];
     postISRCCD [label="postISRCCD\n{detector, exposure}\nExposure"];
-    gaia [label="gaia\n{htmN}"];
-    monster [label="monster\n{htmN}"];
     warps [label="(various warps)\n{patch, visit}\nExposure"];
     node [style="rounded,filled", fillcolor="gray90"];
     initial_pvi [label="initial_pvi\n{detector, visit}\nExposure"];
@@ -41,7 +37,6 @@ digraph the_original {
     fgcm_standard_stars [label="fgcm_standard_stars\n{healpixM}\nParquet"];
     solved_astrometry_wcs [label="solved_astrometry_wcs\n{detector,visit,healpixN}\nExposureCatalog"];
     solved_astrometry_stars [label="solved_astrometry_stars\n{healpixN}\nParquet"];
-    visit_background [label="visit_background\n{visit}\nBackground"];
     final_characterization_summary [label="final_characterization_summary\n{visit}\ExposureCatalog"];
     final_characterization_stars [label="final_characterization_stars\n{visit}\nParquet"];
     final_astrometry_wcs [label="final_astrometry_wcs\n{detector,visit,healpixN}\nExposureCatalog"];
@@ -51,12 +46,16 @@ digraph the_original {
     pvi [label="pvi\n{detector,visit}\nExposure"];
     final_source_detector [label="final_source_detector\n{detector,visit}\nParquet"];
     node [style="rounded,filled", fillcolor="lightgreen"];
+    visit_background [label="visit_background\n{visit}\nBackground"];
     source [label="source\n{visit}\nParquet"];
     compressed_pvi [label="compressed_pvi\n{detector,visit}\nExposure"];
-    warp_mask [label="warp_mask\n{patch, visit}\nMask"];
     pvi [label="pvi\n{detector,visit}\nExposure"];
     node [style="rounded,dashed,filled", fillcolor="lightgreen"];
+    raw [label="raw\n{detector, exposure}\nExposure"];
+    calibs [label="(various calibrations)\n{detector?}"];
     coadds [label="(various coadds)\n{patch, band}\nExposure"];
+    gaia [label="gaia\n{htmN}"];
+    monster [label="monster\n{htmN}"];
     # Connections.
     calibs -> isr;
     raw -> isr;
