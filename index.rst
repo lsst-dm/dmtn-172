@@ -247,10 +247,10 @@ Goals and non-goals
 """""""""""""""""""
 
 We're replacing essentially everything between ISR and coaddition.
-ISR and coaddition will see major changes (spurred by Calibpalooza and cell-based and chi-squared coadds, respectively), but we're considering those out-of-scope and mostly orthogonal.
+ISR and coaddition will also see major changes (spurred by Calibpalooza and cell-based and chi-squared coadds, respectively) on similar timescales (we hope), but we're considering those out-of-scope and mostly orthogonal.
 While we can and should implement this piecemeal when we can, we want a complete vision of what it will look like in the end, and in some cases it may be easier to replace many tasks at once.
 
-We lean towards merging PipelineTasks with the same dimensions that run to back-to-back rather than keeping them distinct.
+We lean towards merging PipelineTasks with the same dimensions that run back-to-back rather than keeping them distinct.
 This is a bit of a shift - many smaller PipelineTasks leads to more flexibility via just pipeline definition changes, which has been very useful in prototyping, but we believe we are exiting the prototyping phase and should instead prioritize the I/O optimization and pipeline-simplicity advantages of having fewer bigger PipelineTasks.
 We very much intend to continue to delegate all real algorithmic work to subtasks; it's just that each PipelineTask will tend towards having more of those.
 
@@ -261,9 +261,9 @@ Conventions
 
 - Task labels are camelCase and start with a lowercase verb: "associateIsolatedStars" instead of "isolatedStarAssociation".
 - Dataset type names are snake_case nouns preceded (if necessary) by adjectives: e.g. "initial_visit_summary"
-- "source" instead of "src" or "sources"
-- Avoid "catalog" or "cat" in dataset type names; use "source", "stars", "objects", or "matches" instead when appropriate.
-- Use some variant of "pvi" for ``{visit, detector}`` image with an image, mask, and variance plane with other components (i.e. ``lsst.afw.image.Exposure``).
+- Use "source" instead of "src" or "sources".
+- Avoid "catalog" or "cat" in dataset type names; use "source", "stars", "object", or "matches" instead when appropriate.
+- Use some variant of "pvi" for any direct (non-difference) ``{visit, detector}`` image dataset with an image, mask, and variance plane (i.e. ``lsst.afw.image.Exposure`` or ``MaskedImage``).
 - Tables that are initially per-detector that will get concatenated into per-visit tables should get a "_detector" suffix so the final thing does not need a suffix (and when we revamp later steps of the pipeline, the same for "_patch" so there's no "_tract").
 - Task labels and dataset type names are for "slots", not specific tasks or connections - usually those are 1-1, but when they are not, the label and dataset type names should remain fixed when a different task is swapped in (our "solveAstrometry" task label slot could be satisfied by either jointcal or GBDES).
   Whether the same is true of the outputs is an open question we'd like to discuss.
@@ -283,30 +283,55 @@ bootstrapImage
    Initial versions of everything - astrometry, photometry, probably PSFs.
    Probably aperture corrections of some kind, but targeted specifically at making compensated apertures work for FGCM.
    These are all attached to its image output, ``initial_pvi``, which is a lot like today's ``calexp``.
+   This will be a fluence image with nJy pixel units, but how much of that is done by this task vs. ISR is TBD.
    Its output catalog, ``initial_source_detector``, will be converted to Parquet before it is written, but not SDM-standardized.
-   Footprints will be written to separate ``SourceCatalog`` dataset, ``initial_footprints``.
-
-   TODO: Why did we say "multiple detection runs" in the google doc?
+   Footprints will be written to a separate ``SourceCatalog`` dataset, ``initial_footprints``.
+   Whether this task does multiple detection rounds (to iterate on CR detection, the source detection filter, or the detection threshold) is TBD; we'd like to minimize that.
+   We would like to avoid running a deblender here (if we do, it will have to happen after we have the PSF model), but this depends on how this performs on crowded fields.
+   We are not thrilled with the name of this task and would love ideas for improvements (which should be coordinated with the names for ``bootstrapVisit``, ``finalizeImage``, ``compressImage``, and ``rebuildImage``).
 
 bootstrapVisit
-   Consolidate the per-detector outputs of ``bootstrapImage`` and recover from failures by using successes (especially for WCSs).
+   Consolidate the per-detector outputs of ``bootstrapImage`` and recover from failures on some detectors by using those that succeeded (especially for WCSs).
 
 associateIsolatedStars
    Pretty much just a renamed ``IsolatedStarAssociationTask``.
-   May need to go deeper than we do today.
 
 solveAstrometry
-   Pretty much just a generic label for ``jointcal`` and
+   Pretty much just a generic label for ``jointcal`` and ``GBDES``.
 
 fgcm
+   Nothing new here, except the sharding and names of the output datasets.
+
 modelVisitBackground
+   A replacement for SkyCorrectionTask, probably using PCA.
+   SkyCorrectionTask will serve as a placeholder until we have something better.
+   Also takes care of subtracting the wings of bright stars.
+
 finalizeCharacterization
+   Nothing new here except new names for the output datasets.
+
+   We are using "characterizations" here to mean "PSFs and aperture corrections", and are not thrilled about that, but we need something that means "PSFs and aperture corrections" that could also absorb aperture corrections being done rather differently than they are today.
+
 finalizeAstrometry
+   This is a re-run of the astrometry solver with slightly different connections; I think it'll be necessary to make our (achromatic) WCSs consistent with the chromatic PSF models that we'll someday produce in ``finalizeCharacterization``.
+   But this needs more thought.
+
 updateVisitSummary
+   Nothing new here (though the current task is only a few weeks old, and apparently still has some bugs).
+
 finalizeImage
-rebuildImage
+   This new task takes all of our hard-won final characterizations and calibrations of the image and produces a final ``{visit, detector}`` ``pvi`` image and full-depth, all-measurements ``final_source_detector`` catalog.
+   The latter will be SDM-standardized before it is ever written to disk.
+
 consolidateSourceTable
+   This task just concatenates the ``final_source_detector`` catalogs into a single per-visit ``source`` catalog.
+
 compressImage
+   This task reads the ``pvi`` dataset, lossy-compresses the image and variance planes, lossless-compresses everything else (at least the mask; I don't know if compressing more than that is possible).
+
+rebuildImage
+   This task reconstructs the uncompressed PVI from the compressed one.
+   It needs to be preceded by rerunning ISR, and then it just subtracts the (retained) ``visit_background`` and pulls the lossless-compressed (or uncompressed) mask plane and components from the compressed PVI.
 
 .. figure:: /_static/great-calibration-refactor.svg
     :name: pl-great-calibration-refactor
@@ -321,7 +346,7 @@ What are the open questions that drive the differences between different viable 
 
 - Do we need some kind of coaddition or warp-comparison to finalize our per-visit background models?  If so, will those also impact PSF modeling and/or aperture corrections?
 
-- Is a second round of astrometric fitting necessary to ensure PDF chromaticity is consistent with our (achromatic) WCSs?  Is it sufficient?
+- Is a second round of astrometric fitting necessary to ensure PSF chromaticity is consistent with our (achromatic) WCSs?  Is it sufficient?
 
 - Are there small changes we could make to better share code with AP?
 

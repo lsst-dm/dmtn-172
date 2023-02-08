@@ -5,7 +5,10 @@ digraph the_original {
     isr [label="isr\n{detector, exposure}"];
     makeWarp [label="makeWarp\n{tract, patch, visit}"];
     compareWarpAssembleCoadd [label="compareWarpAssembleCoadd\n{tract, patch, band}"];
-    node [shape=box,style="filled,bold",fillcolor="gray70"];
+    processCoadds [label="(coadd processing)"];
+    subtractImages [label="(image subtraction)"];
+    forcedPhot [label="(forced photometry)"];
+    node [shape=box,style="filled,bold",fillcolor="lightsalmon"];
     bootstrapImage [label="bootstrapImage\n{detector, visit}"];
     bootstrapVisit [label="bootstrapVisit\n{detector, visit}"];
     associateIsolatedStars [label="associateIsolatedStars\n{healpixM}"];
@@ -20,16 +23,16 @@ digraph the_original {
     consolidateSourceTable [label="consolidateSourceTable\n{visit}"];
     compressImage [label="compressImage\n{detector, visit}"];
     # DatasetTypes
-    node [style="rounded,dashed", fillcolor="gray20"];
+    node [style="rounded,dashed", fillcolor="grey20"];
     postISRCCD [label="postISRCCD\n{detector, exposure}\nExposure"];
     warps [label="(various warps)\n{patch, visit}\nExposure"];
-    node [style="rounded,filled", fillcolor="gray90"];
+    node [style="rounded,filled", fillcolor="lightblue"];
     initial_pvi [label="initial_pvi\n{detector, visit}\nExposure"];
     initial_background [label="initial_background\n{detector,visit}\nBackground"];
-    initial_source_detector [label="initial_source_detector\n{detector, visit}\nArrowTable"];
+    initial_source_detector [label="initial_source_detector\n{detector, visit}\nParquet"];
     initial_footprints [label="initial_footprints\n{detector, visit}\nSourceCatalog"];
     initial_visit_summary [label="initial_visit_summary\n{visit}\nExposureCatalog"];
-    initial_source [label="initial_source\n{visit}\nArrowTable"];
+    initial_source [label="initial_source\n{visit}\nParquet"];
     isolated_stars_source [label="isolated_stars_source\n{healpixM}\nParquet"];
     isolated_stars [label="isolated_stars\n{healpixM}\nParquet"];
     fgcm_photo_calib [label="fgcm_photo_calib\n{visit}\nExposureCatalog"];
@@ -37,7 +40,7 @@ digraph the_original {
     fgcm_standard_stars [label="fgcm_standard_stars\n{healpixM}\nParquet"];
     solved_astrometry_wcs [label="solved_astrometry_wcs\n{detector,visit,healpixN}\nExposureCatalog"];
     solved_astrometry_stars [label="solved_astrometry_stars\n{healpixN}\nParquet"];
-    final_characterization_summary [label="final_characterization_summary\n{visit}\ExposureCatalog"];
+    final_characterization_summary [label="final_characterization_summary\n{visit}\nExposureCatalog"];
     final_characterization_stars [label="final_characterization_stars\n{visit}\nParquet"];
     final_astrometry_wcs [label="final_astrometry_wcs\n{detector,visit,healpixN}\nExposureCatalog"];
     final_astrometry_stars [label="final_astrometry_stars\n{healpixN}\nParquet"];
@@ -54,19 +57,23 @@ digraph the_original {
     raw [label="raw\n{detector, exposure}\nExposure"];
     calibs [label="(various calibrations)\n{detector?}"];
     coadds [label="(various coadds)\n{patch, band}\nExposure"];
-    gaia [label="gaia\n{htmN}"];
     monster [label="monster\n{htmN}"];
+    object [label="object\n{tract}\nParquet"];
+    difference_image [label="(difference images)\n{tract}\nExposure"];
+    forced_source [label="forced_source\n{visit}\nParquet"];
     # Connections.
     calibs -> isr;
     raw -> isr;
     isr -> postISRCCD;
     postISRCCD -> bootstrapImage;
+    monster -> bootstrapImage;
     bootstrapImage -> initial_pvi;
     bootstrapImage -> initial_background;
     bootstrapImage -> initial_source_detector;
     bootstrapImage -> initial_footprints;
     initial_pvi -> bootstrapVisit [label="components only"];
     initial_source_detector -> bootstrapVisit;
+    monster -> bootstrapVisit;
     bootstrapVisit -> initial_visit_summary;
     bootstrapVisit -> initial_source;
     initial_source -> associateIsolatedStars;
@@ -83,13 +90,14 @@ digraph the_original {
     initial_visit_summary -> solveAstrometry;
     isolated_stars -> solveAstrometry;
     isolated_stars_source -> solveAstrometry;
-    gaia -> solveAstrometry;
+    monster -> solveAstrometry;
     fgcm_standard_stars -> solveAstrometry;
     solveAstrometry -> solved_astrometry_stars;
     solveAstrometry -> solved_astrometry_wcs;
     initial_pvi -> modelVisitBackground;
     fgcm_photo_calib -> modelVisitBackground;
     monster -> modelVisitBackground;
+    calibs -> modelVisitBackground;
     modelVisitBackground -> visit_background;
     initial_pvi -> finalizeCharacterization;
     initial_visit_summary -> finalizeCharacterization;
@@ -104,7 +112,7 @@ digraph the_original {
     final_characterization_stars -> finalizeAstrometry;
     isolated_stars -> finalizeAstrometry;
     isolated_stars_source -> finalizeAstrometry;
-    gaia -> finalizeAstrometry;
+    monster -> finalizeAstrometry;
     fgcm_standard_stars -> finalizeAstrometry;
     finalizeAstrometry -> final_astrometry_stars;
     finalizeAstrometry -> final_astrometry_wcs;
@@ -123,10 +131,10 @@ digraph the_original {
     warps -> compareWarpAssembleCoadd;
     compareWarpAssembleCoadd -> coadds;
     compareWarpAssembleCoadd -> warp_mask;
+    initial_pvi -> finalizeImage;
     warp_mask -> finalizeImage;
     final_visit_summary -> finalizeImage;
     visit_background -> finalizeImage;
-    calibs -> finalizeImage;
     finalizeImage -> pvi;
     finalizeImage -> final_source_detector;
     visit_background -> rebuildImage;
@@ -137,4 +145,12 @@ digraph the_original {
     consolidateSourceTable -> source;
     pvi -> compressImage;
     compressImage -> compressed_pvi;
+    coadds -> processCoadds;
+    processCoadds -> object
+    pvi -> subtractImages;
+    subtractImages -> difference_images;
+    difference_images -> forcedPhot;
+    pvi -> forcedPhot;
+    object -> forcedPhot;
+    forcedPhot -> forced_source;
 }
