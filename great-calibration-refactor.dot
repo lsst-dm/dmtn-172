@@ -10,7 +10,7 @@ digraph the_original {
     forcedPhot [label="(forced photometry)"];
     node [shape=box,style="filled,bold",fillcolor="lightsalmon"];
     bootstrapImage [label="bootstrapImage\n{detector, visit}"];
-    bootstrapVisit [label="bootstrapVisit\n{detector, visit}"];
+    bootstrapVisit [label="bootstrapVisit\n{visit}"];
     associateIsolatedStars [label="associateIsolatedStars\n{healpixM}"];
     solveAstrometry [label="solveAstrometry\n{instrument, healpixN}"];
     fgcm [label="(FGCM tasks)\n{instrument}"];
