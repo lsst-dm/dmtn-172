@@ -266,9 +266,9 @@ Conventions
 - Use some variant of "pvi" for any direct (non-difference) ``{visit, detector}`` image dataset with an image, mask, and variance plane (i.e. ``lsst.afw.image.Exposure`` or ``MaskedImage``).
 - Tables that are initially per-detector that will get concatenated into per-visit tables should get a "_detector" suffix so the final thing does not need a suffix (and when we revamp later steps of the pipeline, the same for "_patch" so there's no "_tract").
 - Task labels and dataset type names are for "slots", not specific tasks or connections - usually those are 1-1, but when they are not, the label and dataset type names should remain fixed when a different task is swapped in (our "solveAstrometry" task label slot could be satisfied by either jointcal or GBDES).
-  Whether the same is true of the outputs is an open question we'd like to discuss.
-- "initial" catalogs are not (ever) SDM-standardized, while final catalogs are always SDM-standardized before they are written out.
-  This may present a challenge for analysis tools that want to be able to run on either, but I'm hoping we can minimize analysis of the initial things, as we don't care how good they are in the end.
+- "initial" catalogs are not SDM-standardized before being used as inputs to other main processing tasks, while final catalogs are always SDM-standardized before they are written out.
+  It may be necessary to (partially?) SDM-standardize initial catalogs in order to feed them into the same analysis tooling we expect to run on final catalogs (which will certainly be necessary for at least per-step pipeline validation during full-scale data release processing).
+  But we prefer to consider these initial standardization processes part of the "analysis addition" to the pipeline, and keep it out of the main production pipeline flow, and to minimize this standardization in favor of configuring the input column expected by analysis tasks.
 - Do include a "final" prefix on dataset types that represent the best version of things that are nevertheless temporaries that will not be retained.
   Do not add any prefix to dataset types that will be retained for public access.
 - Convert source and object catalogs to Parquet before ever persisting them; only use SourceCatalog/FITS to hold Footprints.
