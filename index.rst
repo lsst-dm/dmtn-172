@@ -250,7 +250,7 @@ We're replacing essentially everything between ISR and coaddition.
 ISR and coaddition will also see major changes (spurred by Calibpalooza and cell-based and chi-squared coadds, respectively) on similar timescales (we hope), but we're considering those out-of-scope and mostly orthogonal.
 While we can and should implement this piecemeal when we can, we want a complete vision of what it will look like in the end, and in some cases it may be easier to replace many tasks at once.
 
-We lean towards merging PipelineTasks with the same dimensions that run back-to-back rather than keeping them distinct.
+We lean towards merging PipelineTasks with the same dimensions that run back-to-back rather than keeping them distinct, when all other considerations are equal.
 This is a bit of a shift - many smaller PipelineTasks leads to more flexibility via just pipeline definition changes, which has been very useful in prototyping, but we believe we are exiting the prototyping phase and should instead prioritize the I/O optimization and pipeline-simplicity advantages of having fewer bigger PipelineTasks.
 We very much intend to continue to delegate all real algorithmic work to subtasks; it's just that each PipelineTask will tend towards having more of those.
 
