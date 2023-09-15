@@ -270,7 +270,7 @@ Conventions
   It may be necessary to (partially?) SDM-standardize initial catalogs in order to feed them into the same analysis tooling we expect to run on final catalogs (which will certainly be necessary for at least per-step pipeline validation during full-scale data release processing).
   But we prefer to consider these initial standardization processes part of the "analysis addition" to the pipeline, and keep it out of the main production pipeline flow, and to minimize this standardization in favor of configuring the input column expected by analysis tasks.
 - Do include a "final" prefix on dataset types that represent the best version of things that are nevertheless temporaries that will not be retained.
-  Do not add any prefix to dataset types that will be retained for public access.
+  Only add a prefix to dataset types that will not be retained for public access.
 - Convert source and object catalogs to Parquet before ever persisting them; only use SourceCatalog/FITS to hold Footprints.
   We will retain the ``slot_*`` column names and not the underlying names they point to - downstream code should only be referring to the slot columns anyway, and in many cases we won't run multiple algorithms that could satisfy the slot.
   In addition, note that the (final) ``source`` catalogs will be SDM-standardized before being written, so the the ``slot_*`` vs. underlying name question is moot there.
@@ -278,20 +278,18 @@ Conventions
 Task and dataset type notes
 """""""""""""""""""""""""""
 
-bootstrapImage
+calibrateImage
    Initial background subtraction and detection of bright stars (galaxies are considered a nuisance here).
-   Initial versions of everything - astrometry, photometry, probably PSFs.
+   Initial versions of everything - background, astrometry, photometry, PSFs.
    Probably aperture corrections of some kind, but targeted specifically at making compensated apertures work for FGCM.
    These are all attached to its image output, ``initial_pvi``, which is a lot like today's ``calexp``.
-   This will be a fluence image with nJy pixel units, but how much of that is done by this task vs. ISR is TBD.
-   Its output catalog, ``initial_source_detector``, will be converted to Parquet before it is written, but not SDM-standardized.
-   Footprints will be written to a separate ``SourceCatalog`` dataset, ``initial_footprints``.
+   This will be a fluence image with nJy pixel units.
+   Its output catalog, ``initial_stars_detector``, will be converted to Parquet before it is written, but not SDM-standardized.
+   Footprints will be written to a separate ``SourceCatalog`` dataset, ``initial_stars_footprints_detector``.
    Whether this task does multiple detection rounds (to iterate on CR detection, the source detection filter, or the detection threshold) is TBD; we'd like to minimize that.
-   We would like to avoid running a deblender here (if we do, it will have to happen after we have the PSF model), but this depends on how this performs on crowded fields.
-   We are not thrilled with the name of this task and would love ideas for improvements (which should be coordinated with the names for ``bootstrapVisit``, ``finalizeImage``, ``compressImage``, and ``rebuildImage``).
 
-bootstrapVisit
-   Consolidate the per-detector outputs of ``bootstrapImage`` and recover from failures on some detectors by using those that succeeded (especially for WCSs).
+consolidateVisit
+   Consolidate the per-detector outputs of ``calibrateImage`` and recover from failures on some detectors by using those that succeeded (especially for WCSs).
 
 associateIsolatedStars
    Pretty much just a renamed ``IsolatedStarAssociationTask``.
@@ -347,8 +345,6 @@ What are the open questions that drive the differences between different viable 
 - Do we need some kind of coaddition or warp-comparison to finalize our per-visit background models?  If so, will those also impact PSF modeling and/or aperture corrections?
 
 - Is a second round of astrometric fitting necessary to ensure PSF chromaticity is consistent with our (achromatic) WCSs?  Is it sufficient?
-
-- Are there small changes we could make to better share code with AP?
 
 .. Add content here.
 .. Do not include the document title (it's automatically added from metadata.yaml).
