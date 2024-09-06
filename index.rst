@@ -148,8 +148,8 @@ finalizeAstrometry
 updateVisitSummary
    Nothing new here (though the current task is only a few weeks old, and apparently still has some bugs).
 
-finalizeImage
-   This new task takes all of our hard-won final characterizations and calibrations of the image and produces a final ``{visit, detector}`` ``pvi`` image and full-depth, all-measurements ``final_source_detector`` catalog.
+reprocessVisitImage
+   This new task takes all of our hard-won final characterizations and calibrations of the image and produces a final ``{visit, detector}`` ``pvi`` image and full-depth, all-measurements ``sources_detector`` catalog.
    The latter will be SDM-standardized before it is ever written to disk.
 
 consolidateSourceTable
