@@ -92,10 +92,10 @@ Conventions
 
 - Task labels are camelCase and start with a lowercase verb: "associateIsolatedStars" instead of "isolatedStarAssociation".
 - Dataset type names are snake_case nouns preceded (if necessary) by adjectives: e.g. "initial_visit_summary"
-- Use "source" instead of "src" or "sources".
-- Avoid "catalog" or "cat" in dataset type names; use "source", "stars", "object", or "matches" instead when appropriate.
+- Use ``sources`` instead of ``src`` or ``sourceTable_visit``, ``objects`` instead of "objectTable_tract"
+- Avoid "catalog" or "cat" in dataset type names; use "sources", "stars", "objects", or "matches" instead when appropriate.
 - Use some variant of "pvi" for any direct (non-difference) ``{visit, detector}`` image dataset with an image, mask, and variance plane (i.e. ``lsst.afw.image.Exposure`` or ``MaskedImage``).
-- Tables that are initially per-detector that will get concatenated into per-visit tables should get a "_detector" suffix so the final thing does not need a suffix (and when we revamp later steps of the pipeline, the same for "_patch" so there's no "_tract").
+- Tables that are initially per-detector that will get concatenated into per-visit tables should get a ``_detector`` suffix so the final thing does not need a suffix (and when we revamp later steps of the pipeline, the same for ``_patch`` so there's no ``_tract``). For example, ``sources_detector``, which gets merged into the visit-level ``sources``.
 - Task labels and dataset type names are for "slots", not specific tasks or connections - usually those are 1-1, but when they are not, the label and dataset type names should remain fixed when a different task is swapped in (our "solveAstrometry" task label slot could be satisfied by either jointcal or GBDES).
 - "initial" catalogs are not SDM-standardized before being used as inputs to other main processing tasks, while final catalogs are always SDM-standardized before they are written out.
   It may be necessary to (partially?) SDM-standardize initial catalogs in order to feed them into the same analysis tooling we expect to run on final catalogs (which will certainly be necessary for at least per-step pipeline validation during full-scale data release processing).
@@ -104,7 +104,7 @@ Conventions
   Only add a prefix to dataset types that will not be retained for public access.
 - Convert source and object catalogs to Parquet before ever persisting them; only use SourceCatalog/FITS to hold Footprints.
   We will retain the ``slot_*`` column names and not the underlying names they point to - downstream code should only be referring to the slot columns anyway, and in many cases we won't run multiple algorithms that could satisfy the slot.
-  In addition, note that the (final) ``source`` catalogs will be SDM-standardized before being written, so the the ``slot_*`` vs. underlying name question is moot there.
+  In addition, note that the (final) ``sources`` catalogs will be SDM-standardized before being written, so the the ``slot_*`` vs. underlying name question is moot there.
 
 Task and dataset type notes
 """""""""""""""""""""""""""
@@ -153,7 +153,7 @@ finalizeImage
    The latter will be SDM-standardized before it is ever written to disk.
 
 consolidateSourceTable
-   This task just concatenates the ``final_source_detector`` catalogs into a single per-visit ``source`` catalog.
+   This task just concatenates the ``sources_detector`` catalogs into a single per-visit ``sources`` catalog.
 
 compressImage
    This task reads the ``pvi`` dataset, lossy-compresses the image and variance planes, lossless-compresses everything else (at least the mask; I don't know if compressing more than that is possible).
